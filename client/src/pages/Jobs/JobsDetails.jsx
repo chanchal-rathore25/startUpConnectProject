@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from "react";
 import { useParams, useNavigate, Link } from "react-router-dom";
+import toast from "react-hot-toast";
 import {
   ArrowLeft,
   MapPin,
@@ -13,8 +14,11 @@ import {
   Globe,
   Calendar,
   BriefcaseBusiness,
+  X,
+  FileText,
+  Send,
 } from "lucide-react";
-import { fetchJobById } from "../../api/api1";
+import { fetchJobById, applyToJob, toggleSaveJob } from "../../api/api1";
 import { useAuth } from "../../context/AuthContext";
 
 function DetailSkeleton() {
@@ -34,24 +38,117 @@ function DetailSkeleton() {
   );
 }
 
+/* ============================= Apply Modal ============================= */
+function ApplyModal({ job, onClose, onSubmit, submitting, resumeUrl, resumeName }) {
+  const [coverLetter, setCoverLetter] = useState("");
+  const [expectedSalary, setExpectedSalary] = useState("");
+
+  const handleSubmit = (e) => {
+    e.preventDefault();
+    onSubmit({ coverLetter, expectedSalary });
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center px-4">
+      <div className="absolute inset-0 bg-black/40" onClick={onClose} />
+      <div className="relative bg-white rounded-xl shadow-xl w-full max-w-lg max-h-[90vh] overflow-y-auto">
+        <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100 sticky top-0 bg-white">
+          <div>
+            <h2 className="text-base font-semibold text-gray-900">Apply to {job.title}</h2>
+            <p className="text-xs text-gray-500">{job.company}</p>
+          </div>
+          <button onClick={onClose} aria-label="Close" className="p-1.5 rounded-lg text-gray-400 hover:bg-gray-100">
+            <X size={18} />
+          </button>
+        </div>
+
+        <form onSubmit={handleSubmit} className="px-6 py-5 space-y-4">
+          {/* Resume — profile se aata hai, yahan sirf preview */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1.5">Resume</label>
+            {resumeUrl ? (
+              <a
+                href={resumeUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex items-center gap-2 px-3 py-2.5 text-sm text-gray-700 bg-gray-50 border border-gray-200 rounded-lg hover:border-indigo-200 transition-colors"
+              >
+                <FileText size={16} className="text-indigo-600 shrink-0" />
+                {resumeName}
+              </a>
+            ) : (
+              <p className="text-sm text-red-500">
+                Koi resume upload nahi hai.{" "}
+                <Link to="/profile" className="font-medium underline">
+                  Profile me jaake upload karo
+                </Link>
+                .
+              </p>
+            )}
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1.5">Cover letter</label>
+            <textarea
+              value={coverLetter}
+              onChange={(e) => setCoverLetter(e.target.value)}
+              placeholder="Bataiye is role ke liye aap kyun fit ho..."
+              rows={5}
+              className="w-full px-3 py-2.5 text-sm border border-gray-200 rounded-lg outline-none focus:ring-2 focus:ring-indigo-600/30 focus:border-indigo-600"
+            />
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1.5">Expected salary</label>
+            <div className="relative">
+              <IndianRupee size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+              <input
+                value={expectedSalary}
+                onChange={(e) => setExpectedSalary(e.target.value)}
+                placeholder="e.g. ₹12L per annum"
+                className="w-full pl-9 pr-3 py-2.5 text-sm border border-gray-200 rounded-lg outline-none focus:ring-2 focus:ring-indigo-600/30 focus:border-indigo-600"
+              />
+            </div>
+          </div>
+
+          <button
+            type="submit"
+            disabled={submitting || !resumeUrl}
+            className="w-full flex items-center justify-center gap-2 py-3 text-sm font-semibold text-white bg-indigo-600 hover:bg-indigo-700 rounded-lg transition-colors disabled:opacity-60"
+          >
+            <Send size={15} />
+            {submitting ? "Submitting..." : "Submit application"}
+          </button>
+        </form>
+      </div>
+    </div>
+  );
+}
+
+/* ============================= Job Details ============================= */
 export default function JobDetails() {
   const { id } = useParams();
   const navigate = useNavigate();
-  const { user } = useAuth();
+  const { user, token } = useAuth();
 
   const [job, setJob] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
-  const [saved, setSaved] = useState(false);
+  const [saving, setSaving] = useState(false);
   const [applied, setApplied] = useState(false);
+  const [showApplyModal, setShowApplyModal] = useState(false);
+  const [applying, setApplying] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
     setLoading(true);
     setError("");
-    fetchJobById(id)
+    fetchJobById(id, token)
       .then((data) => {
-        if (!cancelled) setJob(data);
+        if (!cancelled) {
+          setJob(data);
+          setApplied(!!data.appliedByMe);
+        }
       })
       .catch((err) => {
         if (!cancelled) setError(err.message || "Job load nahi ho payi.");
@@ -62,14 +159,54 @@ export default function JobDetails() {
     return () => {
       cancelled = true;
     };
-  }, [id]);
+  }, [id, token]);
 
-  const handleApply = () => {
+  const handleToggleSave = async () => {
     if (!user) {
-      navigate("/login");
+      toast.error("Save karne ke liye pehle login karo.");
+      navigate("/login", { state: { from: `/jobs/${id}` } });
       return;
     }
-    setApplied(true);
+    if (saving) return;
+    setSaving(true);
+    setJob((j) => ({ ...j, savedByMe: !j.savedByMe })); // optimistic
+    try {
+      const { saved } = await toggleSaveJob(id, token);
+      toast.success(saved ? "Job saved ❤️" : "Job unsaved");
+    } catch (err) {
+      setJob((j) => ({ ...j, savedByMe: !j.savedByMe })); // rollback
+      toast.error(err.message || "Kuch gadbad ho gayi.");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleOpenApply = () => {
+    if (!user) {
+      navigate("/login", { state: { from: `/jobs/${id}` } });
+      return;
+    }
+    setShowApplyModal(true);
+  };
+
+  const handleSubmitApplication = async ({ coverLetter, expectedSalary }) => {
+    setApplying(true);
+    try {
+      const { applicants } = await applyToJob(id, { coverLetter, expectedSalary }, token);
+      setApplied(true);
+      setJob((j) => ({ ...j, applicants }));
+      setShowApplyModal(false);
+      toast.success("Application bhej di gayi ✅");
+    } catch (err) {
+      if (err.message?.toLowerCase().includes("already")) {
+        setApplied(true);
+        setShowApplyModal(false);
+      } else {
+        toast.error(err.message || "Apply nahi ho paaya. Dobara try karo.");
+      }
+    } finally {
+      setApplying(false);
+    }
   };
 
   if (loading) return <DetailSkeleton />;
@@ -131,15 +268,22 @@ export default function JobDetails() {
 
             <div className="flex items-center gap-2 shrink-0">
               <button
-                onClick={() => setSaved((s) => !s)}
+                onClick={handleToggleSave}
+                disabled={saving}
                 aria-label="Save job"
-                className={`p-2.5 rounded-lg border transition-colors ${
-                  saved ? "text-indigo-600 bg-indigo-50 border-indigo-200" : "text-gray-400 border-gray-200 hover:bg-gray-50"
+                className={`p-2.5 rounded-lg border transition-colors disabled:opacity-50 ${
+                  job.savedByMe
+                    ? "text-indigo-600 bg-indigo-50 border-indigo-200"
+                    : "text-gray-400 border-gray-200 hover:bg-gray-50"
                 }`}
               >
-                <Bookmark size={18} fill={saved ? "currentColor" : "none"} />
+                <Bookmark size={18} fill={job.savedByMe ? "currentColor" : "none"} />
               </button>
               <button
+                onClick={() => {
+                  navigator.clipboard?.writeText(window.location.href);
+                  toast.success("Link copy ho gaya");
+                }}
                 aria-label="Share job"
                 className="p-2.5 rounded-lg border border-gray-200 text-gray-400 hover:bg-gray-50 transition-colors"
               >
@@ -166,12 +310,10 @@ export default function JobDetails() {
 
           <div className="mt-6 pt-6 border-t border-gray-100">
             <button
-              onClick={handleApply}
+              onClick={handleOpenApply}
               disabled={applied}
-              className={`w-full sm:w-auto px-6 py-3 text-sm font-semibold rounded-lg transition-colors ${
-                applied
-                  ? "bg-emerald-50 text-emerald-600 cursor-default"
-                  : "bg-indigo-600 text-white hover:bg-indigo-700"
+              className={`w-full sm:w-auto px-6 py-3 text-sm font-semibold rounded-lg transition-colors disabled:opacity-70 ${
+                applied ? "bg-emerald-50 text-emerald-600 cursor-default" : "bg-indigo-600 text-white hover:bg-indigo-700"
               }`}
             >
               {applied ? "✓ Application sent" : "Apply now"}
@@ -266,6 +408,17 @@ export default function JobDetails() {
           </div>
         </div>
       </div>
+
+      {showApplyModal && (
+        <ApplyModal
+          job={job}
+          onClose={() => setShowApplyModal(false)}
+          onSubmit={handleSubmitApplication}
+          submitting={applying}
+          resumeUrl={user?.resumeUrl}
+          resumeName={user?.resumeName}
+        />
+      )}
     </div>
   );
 }

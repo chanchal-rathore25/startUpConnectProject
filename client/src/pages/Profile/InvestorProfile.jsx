@@ -1,7 +1,7 @@
 import React, { useState } from "react";
 import { Pencil, Save, X, Landmark, IndianRupee, TrendingUp, Plus } from "lucide-react";
+import toast from "react-hot-toast";
 import { useAuth } from "../../context/AuthContext";
-import { updateUserProfile } from "../../api/api1";
 
 const SECTOR_OPTIONS = [
   "Fintech",
@@ -30,9 +30,12 @@ export default function InvestorProfile() {
   const handleSave = async () => {
     setSaving(true);
     try {
-      await updateUserProfile(user.id, form);
-      updateProfile(form);
+      // Seedha backend PATCH /api/users/me ko hit karta hai (AuthContext.updateProfile)
+      await updateProfile(form);
       setEditing(false);
+      toast.success("Profile update ho gayi ✅");
+    } catch (err) {
+      toast.error(err.message || "Save nahi ho paaya.");
     } finally {
       setSaving(false);
     }

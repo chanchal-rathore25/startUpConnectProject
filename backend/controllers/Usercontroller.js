@@ -1,4 +1,5 @@
 const User = require("../models/User");
+const { uploadBufferToCloudinary } = require("../config/cloudinary");
 
 // Security: sirf ye fields hi patch route se update ho sakte hain.
 // name/email/password/role isse edit nahi ho sakte.
@@ -42,16 +43,19 @@ async function updateMe(req, res) {
   }
 }
 
+// Resume ko Cloudinary pe upload karta hai, DB me sirf secure_url save hota hai
 async function uploadResume(req, res) {
   try {
     if (!req.file) return res.status(400).json({ message: "Koi file mili nahi." });
 
+    const result = await uploadBufferToCloudinary(req.file.buffer, {
+      folder: "startupconnect/resumes",
+      filename: `${req.user.id}-${Date.now()}`,
+    });
+
     const user = await User.findByIdAndUpdate(
       req.user.id,
-      {
-        resumeName: req.file.originalname,
-        resumeUrl: `/uploads/resumes/${req.file.filename}`,
-      },
+      { resumeName: req.file.originalname, resumeUrl: result.secure_url },
       { new: true }
     );
 
@@ -61,16 +65,19 @@ async function uploadResume(req, res) {
   }
 }
 
+// Pitch deck ko bhi Cloudinary pe upload karta hai
 async function uploadPitchDeck(req, res) {
   try {
     if (!req.file) return res.status(400).json({ message: "Koi file mili nahi." });
 
+    const result = await uploadBufferToCloudinary(req.file.buffer, {
+      folder: "startupconnect/pitch-decks",
+      filename: `${req.user.id}-${Date.now()}`,
+    });
+
     const user = await User.findByIdAndUpdate(
       req.user.id,
-      {
-        pitchDeckName: req.file.originalname,
-        pitchDeckUrl: `/uploads/pitch-decks/${req.file.filename}`,
-      },
+      { pitchDeckName: req.file.originalname, pitchDeckUrl: result.secure_url },
       { new: true }
     );
 

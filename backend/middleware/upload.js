@@ -1,18 +1,10 @@
 const multer = require("multer");
 const path = require("path");
-const fs = require("fs");
 
-function makeStorage(folder) {
-  const dest = path.join(__dirname, "..", "uploads", folder);
-  fs.mkdirSync(dest, { recursive: true });
-  return multer.diskStorage({
-    destination: (req, file, cb) => cb(null, dest),
-    filename: (req, file, cb) => {
-      const uniqueSuffix = `${Date.now()}-${Math.round(Math.random() * 1e9)}`;
-      cb(null, `${req.user.id}-${uniqueSuffix}${path.extname(file.originalname)}`);
-    },
-  });
-}
+// Memory storage: file buffer seedha RAM me rehta hai, phir controller ise
+// Cloudinary pe upload kar deta hai. Disk pe kuch save nahi hota — isliye
+// Render/Railway jaisi ephemeral-disk hosting pe bhi safe hai.
+const storage = multer.memoryStorage();
 
 const resumeFilter = (req, file, cb) => {
   const allowed = [".pdf", ".doc", ".docx"];
@@ -27,13 +19,13 @@ const deckFilter = (req, file, cb) => {
 };
 
 const uploadResume = multer({
-  storage: makeStorage("resumes"),
+  storage,
   fileFilter: resumeFilter,
   limits: { fileSize: 5 * 1024 * 1024 }, // 5MB
 });
 
 const uploadPitchDeck = multer({
-  storage: makeStorage("pitch-decks"),
+  storage,
   fileFilter: deckFilter,
   limits: { fileSize: 15 * 1024 * 1024 }, // 15MB
 });

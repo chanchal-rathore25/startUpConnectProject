@@ -1,14 +1,16 @@
 import React, { useRef, useState } from "react";
-import { useAuth } from "../../context/AuthContext";
-import { updateUserProfile } from "../../api/api1";
+import { Pencil, Save, X, Plus, Globe, FileText, Upload, Trash2, Briefcase } from "lucide-react";
 import { FaGithub } from "react-icons/fa";
-import { HiOutlinePencil } from "react-icons/hi2";
-import { BsGlobe2 } from "react-icons/bs";
-import {  Save, X, Plus, FileText, Upload, Trash2, Briefcase } from "lucide-react";
+import toast from "react-hot-toast";
+import { useAuth } from "../../context/AuthContext";
+import { uploadResume } from "../../api/api1";
+
 export default function DeveloperProfile() {
-  const { user, updateProfile } = useAuth();
+  const { user, token, updateProfile, setUserFromServer } = useAuth();
   const [editing, setEditing] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [uploadingResume, setUploadingResume] = useState(false);
+  const [uploadError, setUploadError] = useState("");
   const [skillInput, setSkillInput] = useState("");
   const fileInputRef = useRef(null);
 
@@ -17,16 +19,18 @@ export default function DeveloperProfile() {
     github: user.github || "",
     portfolio: user.portfolio || "",
     skills: user.skills || [],
-    resumeName: user.resumeName || null,
     experience: user.experience || [],
   });
 
   const handleSave = async () => {
     setSaving(true);
     try {
-      await updateUserProfile(user.id, form);
-      updateProfile(form);
+      // Ye seedha backend PATCH /api/users/me ko hit karta hai (AuthContext.updateProfile)
+      await updateProfile(form);
       setEditing(false);
+      toast.success("Profile update ho gayi ✅");
+    } catch (err) {
+      toast.error(err.message || "Save nahi ho paaya.");
     } finally {
       setSaving(false);
     }
@@ -38,7 +42,6 @@ export default function DeveloperProfile() {
       github: user.github || "",
       portfolio: user.portfolio || "",
       skills: user.skills || [],
-      resumeName: user.resumeName || null,
       experience: user.experience || [],
     });
     setEditing(false);
@@ -54,12 +57,24 @@ export default function DeveloperProfile() {
 
   const removeSkill = (s) => setForm((f) => ({ ...f, skills: f.skills.filter((x) => x !== s) }));
 
-  const handleResumeUpload = (e) => {
+  const handleResumeUpload = async (e) => {
     const file = e.target.files?.[0];
-    // Note: ye sirf resume ka naam/size store karta hai (demo ke liye).
-    // Real backend me file ko multipart/form-data se S3/Cloudinary pe upload karo
-    // aur wapas mile URL ko resumeUrl field me save karo.
-    if (file) setForm((f) => ({ ...f, resumeName: file.name }));
+    if (!file) return;
+    setUploadingResume(true);
+    setUploadError("");
+    try {
+      // Real backend call — file multipart/form-data se /api/users/me/resume pe jaati hai,
+      // backend Cloudinary pe upload karta hai, DB me sirf URL save hota hai.
+      const { user: updatedUser } = await uploadResume(file, token);
+      setUserFromServer(updatedUser);
+      toast.success("Resume upload ho gaya ✅");
+    } catch (err) {
+      setUploadError(err.message || "Resume upload fail ho gaya.");
+      toast.error(err.message || "Resume upload fail ho gaya.");
+    } finally {
+      setUploadingResume(false);
+      e.target.value = ""; // taaki wahi file dobara select ho sake to bhi onChange fire ho
+    }
   };
 
   const addExperience = () => {
@@ -90,7 +105,7 @@ export default function DeveloperProfile() {
               onClick={() => setEditing(true)}
               className="flex items-center gap-1.5 text-sm font-medium text-indigo-600 hover:text-indigo-700"
             >
-              <HiOutlinePencil  size={14} />
+              <Pencil size={14} />
               Edit
             </button>
           ) : (
@@ -177,7 +192,7 @@ export default function DeveloperProfile() {
             <label className="block text-sm font-medium text-gray-700 mb-1.5">GitHub</label>
             {editing ? (
               <div className="relative">
-                <FaGithub size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+                <Github size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
                 <input
                   value={form.github}
                   onChange={(e) => setForm((f) => ({ ...f, github: e.target.value }))}
@@ -196,7 +211,7 @@ export default function DeveloperProfile() {
             <label className="block text-sm font-medium text-gray-700 mb-1.5">Portfolio</label>
             {editing ? (
               <div className="relative">
-                <BsGlobe2 size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+                <Globe size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
                 <input
                   value={form.portfolio}
                   onChange={(e) => setForm((f) => ({ ...f, portfolio: e.target.value }))}
@@ -206,50 +221,49 @@ export default function DeveloperProfile() {
               </div>
             ) : (
               <p className="text-sm text-gray-600 flex items-center gap-1.5">
-                <BsGlobe2 size={14} className="text-gray-400" />
+                <Globe size={14} className="text-gray-400" />
                 {form.portfolio || "—"}
               </p>
             )}
           </div>
         </div>
 
-        {/* Resume */}
+        {/* Resume — upload hote hi seedha backend pe save hota hai */}
         <div className="mt-5">
           <label className="block text-sm font-medium text-gray-700 mb-1.5">Resume</label>
-          <div className="flex items-center gap-3">
-            {form.resumeName ? (
-              <span className="flex items-center gap-2 px-3 py-2 text-sm text-gray-700 bg-gray-50 border border-gray-200 rounded-lg">
+          <div className="flex items-center gap-3 flex-wrap">
+            {user.resumeName ? (
+              <a
+                href={user.resumeUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex items-center gap-2 px-3 py-2 text-sm text-gray-700 bg-gray-50 border border-gray-200 rounded-lg hover:border-indigo-200 transition-colors"
+              >
                 <FileText size={15} className="text-indigo-600" />
-                {form.resumeName}
-                {editing && (
-                  <button onClick={() => setForm((f) => ({ ...f, resumeName: null }))} aria-label="Remove resume">
-                    <Trash2 size={14} className="text-gray-400 hover:text-red-500" />
-                  </button>
-                )}
-              </span>
+                {user.resumeName}
+              </a>
             ) : (
               <span className="text-sm text-gray-400">Koi resume upload nahi hua.</span>
             )}
-            {editing && (
-              <>
-                <button
-                  onClick={() => fileInputRef.current?.click()}
-                  type="button"
-                  className="flex items-center gap-1.5 px-3 py-2 text-sm font-medium text-indigo-600 border border-indigo-200 rounded-lg hover:bg-indigo-50"
-                >
-                  <Upload size={14} />
-                  {form.resumeName ? "Replace" : "Upload"}
-                </button>
-                <input
-                  ref={fileInputRef}
-                  type="file"
-                  accept=".pdf,.doc,.docx"
-                  onChange={handleResumeUpload}
-                  className="hidden"
-                />
-              </>
-            )}
+            <button
+              onClick={() => fileInputRef.current?.click()}
+              type="button"
+              disabled={uploadingResume}
+              className="flex items-center gap-1.5 px-3 py-2 text-sm font-medium text-indigo-600 border border-indigo-200 rounded-lg hover:bg-indigo-50 disabled:opacity-60"
+            >
+              <Upload size={14} />
+              {uploadingResume ? "Uploading..." : user.resumeName ? "Replace" : "Upload"}
+            </button>
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept=".pdf,.doc,.docx"
+              onChange={handleResumeUpload}
+              className="hidden"
+            />
           </div>
+          {uploadError && <p className="mt-1.5 text-xs text-red-500">{uploadError}</p>}
+          <p className="mt-1.5 text-xs text-gray-400">PDF, DOC ya DOCX — max 5MB.</p>
         </div>
       </div>
 

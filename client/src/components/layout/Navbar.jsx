@@ -89,6 +89,62 @@ function ProfileMenu({ user, onLogout }) {
   );
 }
 
+function NavSearch() {
+  const [open, setOpen] = useState(false);
+  const [value, setValue] = useState("");
+  const navigate = useNavigate();
+  const inputRef = useRef(null);
+
+  useEffect(() => {
+    if (open) inputRef.current?.focus();
+  }, [open]);
+
+  const handleSubmit = (e) => {
+    e.preventDefault();
+    if (!value.trim()) return;
+    navigate(`/jobs?search=${encodeURIComponent(value.trim())}`);
+    setOpen(false);
+    setValue("");
+  };
+
+  if (!open) {
+    return (
+      <button
+        onClick={() => setOpen(true)}
+        aria-label="Search"
+        className="p-2 rounded-full text-gray-500 hover:bg-gray-100 hover:text-gray-900 transition-colors"
+      >
+        <Search size={18} />
+      </button>
+    );
+  }
+
+  return (
+    <form
+      onSubmit={handleSubmit}
+      className="flex items-center gap-1.5 bg-gray-50 border border-gray-200 rounded-full pl-3 pr-1 py-1"
+    >
+      <Search size={15} className="text-gray-400 shrink-0" />
+      <input
+        ref={inputRef}
+        value={value}
+        onChange={(e) => setValue(e.target.value)}
+        onBlur={() => !value && setOpen(false)}
+        placeholder="Search jobs, skills, location..."
+        className="w-44 text-sm bg-transparent outline-none text-gray-900 placeholder-gray-400"
+      />
+      <button
+        type="button"
+        onClick={() => setOpen(false)}
+        aria-label="Close search"
+        className="p-1 rounded-full hover:bg-gray-200"
+      >
+        <X size={13} className="text-gray-400" />
+      </button>
+    </form>
+  );
+}
+
 function Navbar() {
   const [mobileOpen, setMobileOpen] = useState(false);
   const { user, logout } = useAuth();
@@ -131,9 +187,7 @@ function Navbar() {
         </div>
 
         <div className="hidden md:flex items-center gap-2">
-          <button aria-label="Search" className="p-2 rounded-full text-gray-500 hover:bg-gray-100 hover:text-gray-900 transition-colors">
-            <Search size={18} />
-          </button>
+          <NavSearch />
 
           {user ? (
             <ProfileMenu user={user} onLogout={handleLogout} />

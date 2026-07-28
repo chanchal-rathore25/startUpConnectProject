@@ -38,23 +38,56 @@ async function signup(req, res) {
   }
 }
 
+// async function login(req, res) {
+//   try {
+//     const { email, password } = req.body;
+//     if (!email || !password) {
+//       return res.status(400).json({ message: "Email aur password zaroori hai." });
+//     }
+
+//     const user = await User.findOne({ email: email.toLowerCase() }).select("+password");
+//     if (!user) return res.status(401).json({ message: "Email ya password galat hai." });
+
+//     const isMatch = await bcrypt.compare(password, user.password);
+//     if (!isMatch) return res.status(401).json({ message: "Email ya password galat hai." });
+
+//     const token = generateToken(user._id);
+//     res.json({ user: user.toPublicJSON(), token });
+//   } catch (err) {
+//     res.status(500).json({ message: "Login fail ho gaya.", error: err.message });
+//   }
+// }
 async function login(req, res) {
   try {
     const { email, password } = req.body;
-    if (!email || !password) {
-      return res.status(400).json({ message: "Email aur password zaroori hai." });
-    }
 
-    const user = await User.findOne({ email: email.toLowerCase() }).select("+password");
-    if (!user) return res.status(401).json({ message: "Email ya password galat hai." });
+    console.log("Email:", email);
+
+    const user = await User.findOne({
+      email: email.toLowerCase(),
+    }).select("+password");
+
+    console.log("User:", user);
 
     const isMatch = await bcrypt.compare(password, user.password);
-    if (!isMatch) return res.status(401).json({ message: "Email ya password galat hai." });
+
+    console.log("Password Match:", isMatch);
 
     const token = generateToken(user._id);
-    res.json({ user: user.toPublicJSON(), token });
+
+    console.log("Token:", token);
+
+    res.json({
+      user: user.toPublicJSON(),
+      token,
+    });
+
   } catch (err) {
-    res.status(500).json({ message: "Login fail ho gaya.", error: err.message });
+    console.log(err);
+
+    res.status(500).json({
+      message: err.message,
+    });
   }
 }
 

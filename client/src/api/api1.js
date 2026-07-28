@@ -1,22 +1,18 @@
+
 /**
  * StartupConnect — API Service Layer (REAL BACKEND)
  * -------------------------------------------------
- * Ye file poore app ke liye backend se baat karne ka single point hai.
- * Sab kuch actual Express + MongoDB backend se fetch/save hota hai —
- * koi mock data nahi hai.
- *
  * .env me set karo (frontend project root me):
  *   VITE_API_URL=http://localhost:5000/api
- * (agar set nahi kiya to default localhost:5000/api use hoga)
  * -------------------------------------------------
  */
-
+ 
 const BASE_URL = import.meta.env?.VITE_API_URL || "http://localhost:5000/api";
-
+ 
 function authHeaders(token) {
   return token ? { Authorization: `Bearer ${token}` } : {};
 }
-
+ 
 async function handleResponse(res) {
   let data;
   try {
@@ -29,30 +25,66 @@ async function handleResponse(res) {
   }
   return data;
 }
-
+ 
 /* ============================= JOBS ============================= */
-
-export async function fetchJobs({ query = "", type = "All" } = {}) {
-  const params = new URLSearchParams({ query, type });
-  const res = await fetch(`${BASE_URL}/jobs?${params}`);
+ 
+// filters: { query, type, mode, minSalary, minExperience, page, limit }
+export async function fetchJobs(filters = {}, token) {
+  const params = new URLSearchParams();
+  Object.entries(filters).forEach(([key, value]) => {
+    if (value !== undefined && value !== null && value !== "" && value !== "All") {
+      params.set(key, value);
+    }
+  });
+  const res = await fetch(`${BASE_URL}/jobs?${params}`, {
+    headers: { ...authHeaders(token) },
+  });
   return handleResponse(res);
 }
-
-export async function fetchJobById(id) {
-  const res = await fetch(`${BASE_URL}/jobs/${id}`);
+ 
+export async function fetchJobById(id, token) {
+  const res = await fetch(`${BASE_URL}/jobs/${id}`, {
+    headers: { ...authHeaders(token) },
+  });
   return handleResponse(res);
 }
-
-export async function applyToJob(id, token) {
-  const res = await fetch(`${BASE_URL}/jobs/${id}/apply`, {
+ 
+export async function toggleSaveJob(id, token) {
+  const res = await fetch(`${BASE_URL}/jobs/${id}/save`, {
     method: "POST",
     headers: { ...authHeaders(token) },
   });
   return handleResponse(res);
 }
-
+ 
+export async function fetchSavedJobs(token) {
+  const res = await fetch(`${BASE_URL}/jobs/saved/all`, {
+    headers: { ...authHeaders(token) },
+  });
+  return handleResponse(res);
+}
+ 
+// payload: { coverLetter, expectedSalary }
+export async function applyToJob(id, payload, token) {
+  const res = await fetch(`${BASE_URL}/jobs/${id}/apply`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", ...authHeaders(token) },
+    body: JSON.stringify(payload),
+  });
+  return handleResponse(res);
+}
+ 
+/* ============================= DASHBOARD ============================= */
+ 
+export async function fetchDashboard(token) {
+  const res = await fetch(`${BASE_URL}/dashboard`, {
+    headers: { ...authHeaders(token) },
+  });
+  return handleResponse(res);
+}
+ 
 /* ============================= AUTH ============================= */
-
+ 
 export async function signupUser(form) {
   const res = await fetch(`${BASE_URL}/auth/signup`, {
     method: "POST",
@@ -61,7 +93,7 @@ export async function signupUser(form) {
   });
   return handleResponse(res);
 }
-
+ 
 export async function loginUser(email, password) {
   const res = await fetch(`${BASE_URL}/auth/login`, {
     method: "POST",
@@ -70,16 +102,16 @@ export async function loginUser(email, password) {
   });
   return handleResponse(res);
 }
-
+ 
 /* ============================= PROFILE ============================= */
-
+ 
 export async function fetchMyProfile(token) {
   const res = await fetch(`${BASE_URL}/users/me`, {
     headers: { ...authHeaders(token) },
   });
   return handleResponse(res);
 }
-
+ 
 export async function updateUserProfile(patch, token) {
   const res = await fetch(`${BASE_URL}/users/me`, {
     method: "PATCH",
@@ -88,19 +120,18 @@ export async function updateUserProfile(patch, token) {
   });
   return handleResponse(res);
 }
-
-// file: browser File object (from <input type="file">)
+ 
 export async function uploadResume(file, token) {
   const formData = new FormData();
   formData.append("resume", file);
   const res = await fetch(`${BASE_URL}/users/me/resume`, {
     method: "POST",
-    headers: { ...authHeaders(token) }, // Content-Type set mat karo, FormData khud boundary set karega
+    headers: { ...authHeaders(token) }, // Content-Type mat set karo, FormData khud boundary set karega
     body: formData,
   });
   return handleResponse(res);
 }
-
+ 
 export async function uploadPitchDeck(file, token) {
   const formData = new FormData();
   formData.append("pitchDeck", file);

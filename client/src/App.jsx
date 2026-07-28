@@ -1,4 +1,5 @@
 import React from 'react'
+import { Toaster } from 'react-hot-toast'
 import Navbar from './components/layout/Navbar'
 import Home from './pages/Home/Home'
 import StartUpConnect from './pages/Startup/StartUpConnect'
@@ -8,6 +9,7 @@ import About from './pages/About/About'
 import SignupPage from './pages/Auth/Signup'
 import LoginPage from './pages/Auth/Login'
 import Profile from './pages/Profile/Profile'
+import Dashboard from './pages/Dashboard/Dashboard'
 import { Routes, Route } from 'react-router-dom';
 import Footer from './components/layout/Footer'
 import StartUpDetails from './pages/Startup/StartUpDetails'
@@ -28,6 +30,7 @@ const App = () => {
   return (
     <AuthProvider>
       <div>
+        <Toaster position="top-center" toastOptions={{ duration: 3000 }} />
         <Navbar />
         <Routes>
           <Route path="/" element={<Home />} />
@@ -39,10 +42,10 @@ const App = () => {
           <Route path="/signup" element={<SignupPage />} />
           <Route path="/login" element={<LoginPage />} />
           <Route path="/profile" element={<Profile />} />
+          <Route path="/dashboard" element={<Dashboard />} />
 
           {/* Upcoming pages */}
           <Route path="/search" element={<ComingSoon title="Search Page" />} />
-          <Route path="/dashboard" element={<ComingSoon title="Dashboard" />} />
         </Routes>
         <Footer />
       </div>

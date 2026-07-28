@@ -1,11 +1,16 @@
 const express = require("express");
-const { getJobs, getJobById, applyToJob } = require("../controllers/jobController");
-const { protect } = require("../middleware/auth");
+const { getJobs, getJobById, toggleSaveJob, getSavedJobs, applyToJob } = require("../controllers/jobController");
+const { protect, optionalProtect } = require("../middleware/auth");
 
 const router = express.Router();
 
-router.get("/", getJobs);
-router.get("/:id", getJobById);
+// IMPORTANT: /saved/all route /:id se pehle aani chahiye, warna "saved" ko
+// job id samajh liya jayega.
+router.get("/saved/all", protect, getSavedJobs);
+
+router.get("/", optionalProtect, getJobs);
+router.get("/:id", optionalProtect, getJobById);
+router.post("/:id/save", protect, toggleSaveJob);
 router.post("/:id/apply", protect, applyToJob);
 
 module.exports = router;

@@ -1,6 +1,9 @@
+
+
 import React, { useState } from "react";
 import { Link, useNavigate, useLocation } from "react-router-dom";
 import { Rocket, Mail, Lock, Eye, EyeOff } from "lucide-react";
+import toast from "react-hot-toast";
 import { useAuth } from "../../context/AuthContext";
 
 /**
@@ -8,7 +11,7 @@ import { useAuth } from "../../context/AuthContext";
  * -------------------------------------------------
  * login() AuthContext se aata hai, jo services/api.js ke loginUser()
  * ko call karta hai. Abhi mock backend hai (localStorage), real MERN
- * backend connect karne ke liye sirf api.js me USE_MOCK = false karna hai.
+ * backend real hai — login() seedha /api/auth/login ko hit karta hai.
  * -------------------------------------------------
  */
 export default function LoginPage() {
@@ -20,7 +23,7 @@ export default function LoginPage() {
   const { login } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
-  const redirectTo = location.state?.from || "/";
+  const redirectTo = location.state?.from || "/dashboard";
 
   const handleChange = (e) => setForm((f) => ({ ...f, [e.target.name]: e.target.value }));
 
@@ -29,10 +32,12 @@ export default function LoginPage() {
     setError("");
     setLoading(true);
     try {
-      await login(form.email, form.password);
+      const loggedInUser = await login(form.email, form.password);
+      toast.success(`Welcome back, ${loggedInUser.name.split(" ")[0]} 👋`);
       navigate(redirectTo, { replace: true });
     } catch (err) {
       setError(err.message || "Kuch gadbad ho gayi. Dobara try karo.");
+      toast.error(err.message || "Login fail ho gaya.");
     } finally {
       setLoading(false);
     }

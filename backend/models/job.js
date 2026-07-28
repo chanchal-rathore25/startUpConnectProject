@@ -1,5 +1,5 @@
 const mongoose = require("mongoose");
-
+ 
 const companyInfoSchema = new mongoose.Schema(
   {
     size: { type: String, default: "" },
@@ -8,7 +8,7 @@ const companyInfoSchema = new mongoose.Schema(
   },
   { _id: false }
 );
-
+ 
 const jobSchema = new mongoose.Schema(
   {
     title: { type: String, required: true },
@@ -19,7 +19,9 @@ const jobSchema = new mongoose.Schema(
     type: { type: String, enum: ["Full-time", "Part-time", "Internship"], required: true },
     mode: { type: String, default: "On-site" },
     salary: { type: String, required: true },
+    salaryMinLPA: { type: Number, default: 0 }, // filter ke liye — e.g. "₹8L–14L" -> 8
     experience: { type: String, default: "" },
+    experienceMinYrs: { type: Number, default: 0 }, // filter ke liye — e.g. "2–4 years" -> 2
     tags: { type: [String], default: [] },
     about: { type: String, default: "" },
     description: { type: String, default: "" },
@@ -31,7 +33,7 @@ const jobSchema = new mongoose.Schema(
   },
   { timestamps: true }
 );
-
+ 
 // "Posted 2 days ago" jaisa relative label frontend ko response me bhejte hain
 jobSchema.methods.toPublicJSON = function () {
   const obj = this.toObject();
@@ -39,7 +41,7 @@ jobSchema.methods.toPublicJSON = function () {
   obj.posted = timeAgo(obj.createdAt);
   return obj;
 };
-
+ 
 function timeAgo(date) {
   const seconds = Math.floor((Date.now() - new Date(date).getTime()) / 1000);
   if (seconds < 60) return "Just now";
@@ -54,5 +56,8 @@ function timeAgo(date) {
   if (weeks === 1) return "1 week ago";
   return `${weeks} weeks ago`;
 }
-
+ 
+// Search ke liye text index — title, company, tags, location sab cover karta hai
+jobSchema.index({ title: "text", company: "text", tags: "text", location: "text" });
+ 
 module.exports = mongoose.model("Job", jobSchema);

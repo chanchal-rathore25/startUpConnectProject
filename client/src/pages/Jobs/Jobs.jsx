@@ -1,5 +1,6 @@
-import React, { useEffect, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import React, { useEffect, useState, useCallback } from "react";
+import { useNavigate, useSearchParams } from "react-router-dom";
+import toast from "react-hot-toast";
 import {
   Search,
   MapPin,
@@ -11,33 +12,76 @@ import {
   IndianRupee,
   Users,
   ArrowUpRight,
+  ChevronLeft,
+  ChevronRight,
+  X,
 } from "lucide-react";
-import { fetchJobs } from "../../api/api1";
+import { fetchJobs, toggleSaveJob } from "../../api/api1";
+import { useAuth } from "../../context/AuthContext";
 
 const JOB_TYPES = ["All", "Full-time", "Part-time", "Internship"];
+const MODES = ["All", "Remote", "Hybrid", "On-site"];
+const SALARY_OPTIONS = [
+  { label: "Any salary", value: "" },
+  { label: "₹5L+", value: "5" },
+  { label: "₹10L+", value: "10" },
+  { label: "₹15L+", value: "15" },
+];
+const EXPERIENCE_OPTIONS = [
+  { label: "Any experience", value: "" },
+  { label: "Fresher", value: "0" },
+  { label: "1+ years", value: "1" },
+  { label: "3+ years", value: "3" },
+  { label: "5+ years", value: "5" },
+];
+
+/* Facebook-style shimmer skeleton */
+function ShimmerStyles() {
+  return (
+    <style>{`
+      @keyframes sc-shimmer {
+        0% { background-position: -400px 0; }
+        100% { background-position: 400px 0; }
+      }
+      .sc-shimmer {
+        background: linear-gradient(90deg, #f1f5f9 25%, #e9edf3 37%, #f1f5f9 63%);
+        background-size: 800px 100%;
+        animation: sc-shimmer 1.4s ease-in-out infinite;
+      }
+    `}</style>
+  );
+}
 
 function JobCardSkeleton() {
   return (
-    <div className="bg-white border border-gray-200 rounded-xl p-5 animate-pulse">
+    <div className="bg-white border border-gray-200 rounded-xl p-5">
       <div className="flex items-center gap-3">
-        <div className="w-11 h-11 rounded-lg bg-gray-100" />
+        <div className="w-11 h-11 rounded-lg sc-shimmer" />
         <div className="flex-1 space-y-2">
-          <div className="h-3.5 w-2/3 bg-gray-100 rounded" />
-          <div className="h-3 w-1/2 bg-gray-100 rounded" />
+          <div className="h-3.5 w-2/3 rounded sc-shimmer" />
+          <div className="h-3 w-1/2 rounded sc-shimmer" />
         </div>
       </div>
-      <div className="mt-5 h-3 w-full bg-gray-100 rounded" />
-      <div className="mt-2 h-3 w-3/4 bg-gray-100 rounded" />
+      <div className="mt-5 h-3 w-full rounded sc-shimmer" />
+      <div className="mt-2 h-3 w-3/4 rounded sc-shimmer" />
       <div className="mt-5 flex gap-2">
-        <div className="h-5 w-16 bg-gray-100 rounded-full" />
-        <div className="h-5 w-16 bg-gray-100 rounded-full" />
+        <div className="h-5 w-16 rounded-full sc-shimmer" />
+        <div className="h-5 w-16 rounded-full sc-shimmer" />
       </div>
     </div>
   );
 }
 
-function JobCard({ job, onOpen }) {
-  const [saved, setSaved] = useState(false);
+function JobCard({ job, onOpen, onToggleSave }) {
+  const [saving, setSaving] = useState(false);
+
+  const handleSaveClick = async (e) => {
+    e.stopPropagation();
+    if (saving) return;
+    setSaving(true);
+    await onToggleSave(job);
+    setSaving(false);
+  };
 
   return (
     <div
@@ -65,16 +109,14 @@ function JobCard({ job, onOpen }) {
           </div>
         </div>
         <button
-          onClick={(e) => {
-            e.stopPropagation();
-            setSaved((s) => !s);
-          }}
+          onClick={handleSaveClick}
           aria-label="Save job"
-          className={`p-2 rounded-full transition-colors shrink-0 ${
-            saved ? "text-indigo-600 bg-indigo-50" : "text-gray-400 hover:bg-gray-100"
+          disabled={saving}
+          className={`p-2 rounded-full transition-colors shrink-0 disabled:opacity-50 ${
+            job.savedByMe ? "text-indigo-600 bg-indigo-50" : "text-gray-400 hover:bg-gray-100"
           }`}
         >
-          <Bookmark size={18} fill={saved ? "currentColor" : "none"} />
+          <Bookmark size={18} fill={job.savedByMe ? "currentColor" : "none"} />
         </button>
       </div>
 
@@ -120,20 +162,46 @@ function JobCard({ job, onOpen }) {
 }
 
 export default function Jobs() {
-  const [activeType, setActiveType] = useState("All");
-  const [query, setQuery] = useState("");
+  const [searchParams, setSearchParams] = useSearchParams();
+  const navigate = useNavigate();
+  const { user, token } = useAuth();
+
+  const query = searchParams.get("search") || "";
+  const activeType = searchParams.get("type") || "All";
+  const activeMode = searchParams.get("mode") || "All";
+  const minSalary = searchParams.get("minSalary") || "";
+  const minExperience = searchParams.get("minExperience") || "";
+  const page = parseInt(searchParams.get("page") || "1", 10);
+
+  const [localQuery, setLocalQuery] = useState(query);
+  const [showFilters, setShowFilters] = useState(false);
   const [jobs, setJobs] = useState([]);
+  const [total, setTotal] = useState(0);
+  const [totalPages, setTotalPages] = useState(1);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
-  const navigate = useNavigate();
+
+  const updateParams = (patch) => {
+    const next = new URLSearchParams(searchParams);
+    Object.entries(patch).forEach(([key, value]) => {
+      if (value === "" || value === "All" || value === undefined) next.delete(key);
+      else next.set(key, value);
+    });
+    if (!("page" in patch)) next.delete("page"); // filter badalne pe page 1 pe reset
+    setSearchParams(next);
+  };
 
   useEffect(() => {
     let cancelled = false;
     setLoading(true);
     setError("");
-    fetchJobs({ query, type: activeType })
+    fetchJobs({ query, type: activeType, mode: activeMode, minSalary, minExperience, page, limit: 9 }, token)
       .then((data) => {
-        if (!cancelled) setJobs(data);
+        if (!cancelled) {
+          setJobs(data.jobs);
+          setTotal(data.total);
+          setTotalPages(data.totalPages);
+        }
       })
       .catch((err) => {
         if (!cancelled) setError(err.message || "Jobs load nahi ho paaye.");
@@ -144,12 +212,46 @@ export default function Jobs() {
     return () => {
       cancelled = true;
     };
-  }, [query, activeType]);
+  }, [query, activeType, activeMode, minSalary, minExperience, page, token]);
+
+  const handleSearchSubmit = (e) => {
+    e.preventDefault();
+    updateParams({ search: localQuery });
+  };
 
   const handleOpenJob = (id) => navigate(`/jobs/${id}`);
 
+  const handleToggleSave = useCallback(
+    async (job) => {
+      if (!user) {
+        toast.error("Save karne ke liye pehle login karo.");
+        navigate("/login", { state: { from: "/jobs" } });
+        return;
+      }
+      // Optimistic UI update
+      setJobs((prev) => prev.map((j) => (j.id === job.id ? { ...j, savedByMe: !j.savedByMe } : j)));
+      try {
+        const { saved } = await toggleSaveJob(job.id, token);
+        toast.success(saved ? "Job saved ❤️" : "Job unsaved");
+      } catch (err) {
+        // Rollback on failure
+        setJobs((prev) => prev.map((j) => (j.id === job.id ? { ...j, savedByMe: job.savedByMe } : j)));
+        toast.error(err.message || "Kuch gadbad ho gayi.");
+      }
+    },
+    [user, token, navigate]
+  );
+
+  const activeFilterCount = [activeType !== "All", activeMode !== "All", !!minSalary, !!minExperience].filter(
+    Boolean
+  ).length;
+
+  const clearFilters = () => updateParams({ type: "All", mode: "All", minSalary: "", minExperience: "" });
+
   return (
     <div className="min-h-screen bg-gray-50 font-sans">
+      <ShimmerStyles />
+
       {/* Page header */}
       <section className="bg-white border-b border-gray-100">
         <div className="max-w-6xl mx-auto px-4 sm:px-6 py-10">
@@ -157,31 +259,56 @@ export default function Jobs() {
             Find your next role at a growing startup
           </h1>
           <p className="mt-2 text-gray-500">
-            {loading ? "Loading open positions…" : `${jobs.length} open positions from vetted startups on StartupConnect`}
+            {loading ? "Loading open positions…" : `${total} open positions from vetted startups on StartupConnect`}
           </p>
 
-          <div className="mt-6 flex flex-col sm:flex-row gap-3">
+          <form onSubmit={handleSearchSubmit} className="mt-6 flex flex-col sm:flex-row gap-3">
             <div className="flex-1 flex items-center gap-2 bg-white border border-gray-200 rounded-full px-4 py-2.5 focus-within:ring-2 focus-within:ring-indigo-600/30 focus-within:border-indigo-600">
               <Search size={18} className="text-gray-400 shrink-0" />
               <input
                 type="text"
-                value={query}
-                onChange={(e) => setQuery(e.target.value)}
-                placeholder="Search by title or company..."
+                value={localQuery}
+                onChange={(e) => setLocalQuery(e.target.value)}
+                placeholder="Search by title, company, skill, or location..."
                 className="w-full text-sm text-gray-900 placeholder-gray-400 outline-none"
               />
+              {localQuery && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setLocalQuery("");
+                    updateParams({ search: "" });
+                  }}
+                  aria-label="Clear search"
+                >
+                  <X size={15} className="text-gray-400 hover:text-gray-600" />
+                </button>
+              )}
             </div>
-            <button className="flex items-center justify-center gap-2 px-4 py-2.5 text-sm font-medium text-gray-700 border border-gray-200 rounded-full hover:border-gray-300 transition-colors">
+            <button
+              type="button"
+              onClick={() => setShowFilters((s) => !s)}
+              className={`flex items-center justify-center gap-2 px-4 py-2.5 text-sm font-medium border rounded-full transition-colors ${
+                showFilters || activeFilterCount > 0
+                  ? "bg-indigo-50 text-indigo-600 border-indigo-200"
+                  : "text-gray-700 border-gray-200 hover:border-gray-300"
+              }`}
+            >
               <SlidersHorizontal size={16} />
               Filters
+              {activeFilterCount > 0 && (
+                <span className="w-4 h-4 flex items-center justify-center text-[10px] font-bold text-white bg-indigo-600 rounded-full">
+                  {activeFilterCount}
+                </span>
+              )}
             </button>
-          </div>
+          </form>
 
           <div className="mt-4 flex items-center gap-2 flex-wrap">
             {JOB_TYPES.map((type) => (
               <button
                 key={type}
-                onClick={() => setActiveType(type)}
+                onClick={() => updateParams({ type })}
                 className={`px-3.5 py-1.5 text-xs font-medium rounded-full border transition-colors ${
                   activeType === type
                     ? "bg-indigo-600 text-white border-indigo-600"
@@ -192,6 +319,66 @@ export default function Jobs() {
               </button>
             ))}
           </div>
+
+          {/* Filters panel */}
+          {showFilters && (
+            <div className="mt-4 p-4 bg-gray-50 border border-gray-200 rounded-xl grid sm:grid-cols-3 gap-4">
+              <div>
+                <label className="block text-xs font-medium text-gray-600 mb-1.5">Work mode</label>
+                <div className="flex flex-wrap gap-1.5">
+                  {MODES.map((m) => (
+                    <button
+                      key={m}
+                      onClick={() => updateParams({ mode: m })}
+                      className={`px-2.5 py-1 text-xs font-medium rounded-full border transition-colors ${
+                        activeMode === m
+                          ? "bg-indigo-600 text-white border-indigo-600"
+                          : "bg-white text-gray-600 border-gray-200 hover:border-gray-300"
+                      }`}
+                    >
+                      {m}
+                    </button>
+                  ))}
+                </div>
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-gray-600 mb-1.5">Minimum salary</label>
+                <select
+                  value={minSalary}
+                  onChange={(e) => updateParams({ minSalary: e.target.value })}
+                  className="w-full px-2.5 py-1.5 text-xs border border-gray-200 rounded-lg outline-none focus:ring-2 focus:ring-indigo-600/30"
+                >
+                  {SALARY_OPTIONS.map((o) => (
+                    <option key={o.value} value={o.value}>
+                      {o.label}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-gray-600 mb-1.5">Minimum experience</label>
+                <select
+                  value={minExperience}
+                  onChange={(e) => updateParams({ minExperience: e.target.value })}
+                  className="w-full px-2.5 py-1.5 text-xs border border-gray-200 rounded-lg outline-none focus:ring-2 focus:ring-indigo-600/30"
+                >
+                  {EXPERIENCE_OPTIONS.map((o) => (
+                    <option key={o.value} value={o.value}>
+                      {o.label}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              {activeFilterCount > 0 && (
+                <button
+                  onClick={clearFilters}
+                  className="sm:col-span-3 text-left text-xs font-medium text-red-500 hover:text-red-600"
+                >
+                  Clear all filters
+                </button>
+              )}
+            </div>
+          )}
         </div>
       </section>
 
@@ -199,7 +386,7 @@ export default function Jobs() {
       <section className="max-w-6xl mx-auto px-4 sm:px-6 py-10">
         {loading ? (
           <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-5">
-            {Array.from({ length: 6 }).map((_, i) => (
+            {Array.from({ length: 9 }).map((_, i) => (
               <JobCardSkeleton key={i} />
             ))}
           </div>
@@ -208,15 +395,57 @@ export default function Jobs() {
             <p className="text-red-500">{error}</p>
           </div>
         ) : jobs.length > 0 ? (
-          <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-5">
-            {jobs.map((job) => (
-              <JobCard key={job.id} job={job} onOpen={handleOpenJob} />
-            ))}
-          </div>
+          <>
+            <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-5">
+              {jobs.map((job) => (
+                <JobCard key={job.id} job={job} onOpen={handleOpenJob} onToggleSave={handleToggleSave} />
+              ))}
+            </div>
+
+            {/* Pagination */}
+            {totalPages > 1 && (
+              <div className="mt-10 flex items-center justify-center gap-1.5">
+                <button
+                  onClick={() => updateParams({ page: Math.max(1, page - 1) })}
+                  disabled={page === 1}
+                  className="p-2 rounded-lg border border-gray-200 text-gray-500 hover:bg-gray-50 disabled:opacity-40 disabled:hover:bg-transparent transition-colors"
+                  aria-label="Previous page"
+                >
+                  <ChevronLeft size={16} />
+                </button>
+                {Array.from({ length: totalPages }, (_, i) => i + 1).map((p) => (
+                  <button
+                    key={p}
+                    onClick={() => updateParams({ page: p })}
+                    className={`w-9 h-9 text-sm font-medium rounded-lg transition-colors ${
+                      p === page
+                        ? "bg-indigo-600 text-white"
+                        : "text-gray-600 border border-gray-200 hover:bg-gray-50"
+                    }`}
+                  >
+                    {p}
+                  </button>
+                ))}
+                <button
+                  onClick={() => updateParams({ page: Math.min(totalPages, page + 1) })}
+                  disabled={page === totalPages}
+                  className="p-2 rounded-lg border border-gray-200 text-gray-500 hover:bg-gray-50 disabled:opacity-40 disabled:hover:bg-transparent transition-colors"
+                  aria-label="Next page"
+                >
+                  <ChevronRight size={16} />
+                </button>
+              </div>
+            )}
+          </>
         ) : (
           <div className="text-center py-20">
             <Briefcase size={32} className="mx-auto text-gray-300" />
             <p className="mt-3 text-gray-500">No jobs match your search.</p>
+            {activeFilterCount > 0 && (
+              <button onClick={clearFilters} className="mt-3 text-sm font-medium text-indigo-600 hover:text-indigo-700">
+                Clear filters
+              </button>
+            )}
           </div>
         )}
       </section>

@@ -17,7 +17,9 @@ const jobs = [
     type: "Full-time",
     mode: "On-site",
     salary: "₹8L – ₹14L",
+    salaryMinLPA: 8,
     experience: "1–3 years",
+    experienceMinYrs: 1,
     tags: ["React", "Tailwind", "TypeScript"],
     about:
       "Nimbus AI is building an AI-native analytics platform for growing startups. We ship fast, care deeply about UX, and keep our team lean and senior.",
@@ -48,7 +50,9 @@ const jobs = [
     type: "Full-time",
     mode: "Remote",
     salary: "₹10L – ₹18L",
+    salaryMinLPA: 10,
     experience: "2–4 years",
+    experienceMinYrs: 2,
     tags: ["Node.js", "MongoDB", "AWS"],
     about:
       "GreenGrid helps housing societies track and reduce their energy footprint with smart metering. We're a climate-tech startup backed by top VCs.",
@@ -79,7 +83,9 @@ const jobs = [
     type: "Part-time",
     mode: "Hybrid",
     salary: "₹40k – ₹60k /mo",
+    salaryMinLPA: 5,
     experience: "1–2 years",
+    experienceMinYrs: 1,
     tags: ["Figma", "UI/UX"],
     about:
       "Carto is reimagining how local businesses discover and manage their storefronts online, with a design-first approach to every feature we ship.",
@@ -110,7 +116,9 @@ const jobs = [
     type: "Internship",
     mode: "On-site",
     salary: "₹15k /mo",
+    salaryMinLPA: 2,
     experience: "0–1 years",
+    experienceMinYrs: 0,
     tags: ["SEO", "Content", "Analytics"],
     about:
       "Nimbus AI is building an AI-native analytics platform for growing startups. This internship is a great launchpad into startup marketing.",
@@ -141,7 +149,9 @@ const jobs = [
     type: "Full-time",
     mode: "Remote",
     salary: "₹12L – ₹20L",
+    salaryMinLPA: 12,
     experience: "2–5 years",
+    experienceMinYrs: 2,
     tags: ["React", "Express", "MongoDB"],
     about:
       "PayLoop is building simple, transparent payment infrastructure for Indian startups. We're a small, senior team shipping in production every week.",
@@ -172,7 +182,9 @@ const jobs = [
     type: "Full-time",
     mode: "Hybrid",
     salary: "₹14L – ₹22L",
+    salaryMinLPA: 14,
     experience: "3–6 years",
+    experienceMinYrs: 3,
     tags: ["Docker", "Kubernetes", "CI/CD"],
     about:
       "GreenGrid helps housing societies track and reduce their energy footprint with smart metering. We're a climate-tech startup backed by top VCs.",

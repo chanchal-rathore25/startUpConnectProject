@@ -1,7 +1,9 @@
 import React, { useEffect, useRef, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { Search, Rocket, Menu, X, User, LayoutDashboard, LogOut, ChevronDown } from "lucide-react";
+import { Search, Rocket, Menu, X, User, LayoutDashboard, LogOut, ChevronDown, MessageCircle, Bell, Check } from "lucide-react";
 import { useAuth } from "../../context/AuthContext";
+import { useSocket } from "../../context/SocketContext";
+import { fetchConversations, fetchNotifications, markNotificationRead, markAllNotificationsRead } from "../../api/api1";
 
 const ROLE_LABEL = {
   developer: "Developer",
@@ -89,6 +91,136 @@ function ProfileMenu({ user, onLogout }) {
   );
 }
 
+function timeAgo(date) {
+  const seconds = Math.floor((Date.now() - new Date(date).getTime()) / 1000);
+  if (seconds < 60) return "just now";
+  const minutes = Math.floor(seconds / 60);
+  if (minutes < 60) return `${minutes}m ago`;
+  const hours = Math.floor(minutes / 60);
+  if (hours < 24) return `${hours}h ago`;
+  const days = Math.floor(hours / 24);
+  return `${days}d ago`;
+}
+
+function NotificationBell() {
+  const { token } = useAuth();
+  const { socket } = useSocket();
+  const navigate = useNavigate();
+  const [open, setOpen] = useState(false);
+  const [notifications, setNotifications] = useState([]);
+  const [unreadCount, setUnreadCount] = useState(0);
+  const menuRef = useRef(null);
+
+  const loadNotifications = () => {
+    if (!token) return;
+    fetchNotifications(token)
+      .then((data) => {
+        setNotifications(data.notifications);
+        setUnreadCount(data.unreadCount);
+      })
+      .catch(() => {});
+  };
+
+  useEffect(() => {
+    loadNotifications();
+  }, [token]);
+
+  useEffect(() => {
+    if (!socket) return;
+    const handleNew = (notif) => {
+      setNotifications((prev) => [notif, ...prev].slice(0, 30));
+      setUnreadCount((c) => c + 1);
+    };
+    socket.on("notification:new", handleNew);
+    return () => socket.off("notification:new", handleNew);
+  }, [socket]);
+
+  useEffect(() => {
+    function handleClickOutside(e) {
+      if (menuRef.current && !menuRef.current.contains(e.target)) setOpen(false);
+    }
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
+
+  const handleOpenNotification = async (notif) => {
+    if (!notif.read) {
+      setNotifications((prev) => prev.map((n) => (n.id === notif.id ? { ...n, read: true } : n)));
+      setUnreadCount((c) => Math.max(0, c - 1));
+      markNotificationRead(notif.id, token).catch(() => {});
+    }
+    setOpen(false);
+    if (notif.link) navigate(notif.link);
+  };
+
+  const handleMarkAllRead = async () => {
+    setNotifications((prev) => prev.map((n) => ({ ...n, read: true })));
+    setUnreadCount(0);
+    try {
+      await markAllNotificationsRead(token);
+    } catch {
+      // ignore — next open will resync
+    }
+  };
+
+  return (
+    <div className="relative" ref={menuRef}>
+      <button
+        onClick={() => setOpen((o) => !o)}
+        aria-label="Notifications"
+        className="relative p-2 rounded-full text-gray-500 hover:bg-gray-100 hover:text-gray-900 transition-colors"
+      >
+        <Bell size={18} />
+        {unreadCount > 0 && (
+          <span className="absolute top-0.5 right-0.5 w-4 h-4 flex items-center justify-center text-[10px] font-bold text-white bg-red-500 rounded-full">
+            {unreadCount > 9 ? "9+" : unreadCount}
+          </span>
+        )}
+      </button>
+
+      {open && (
+        <div className="absolute right-0 mt-2 w-80 bg-white border border-gray-200 rounded-xl shadow-lg py-2 z-40 max-h-96 overflow-y-auto">
+          <div className="flex items-center justify-between px-4 py-2 border-b border-gray-100">
+            <p className="text-sm font-semibold text-gray-900">Notifications</p>
+            {unreadCount > 0 && (
+              <button
+                onClick={handleMarkAllRead}
+                className="flex items-center gap-1 text-xs font-medium text-indigo-600 hover:text-indigo-700"
+              >
+                <Check size={12} />
+                Mark all read
+              </button>
+            )}
+          </div>
+
+          {notifications.length === 0 ? (
+            <p className="px-4 py-6 text-sm text-gray-400 text-center">Koi notification nahi hai.</p>
+          ) : (
+            notifications.map((n) => (
+              <button
+                key={n.id}
+                onClick={() => handleOpenNotification(n)}
+                className={`w-full text-left px-4 py-3 border-b border-gray-50 last:border-0 hover:bg-gray-50 transition-colors ${
+                  !n.read ? "bg-indigo-50/40" : ""
+                }`}
+              >
+                <div className="flex items-start gap-2">
+                  {!n.read && <span className="mt-1.5 w-1.5 h-1.5 rounded-full bg-indigo-600 shrink-0" />}
+                  <div className="min-w-0">
+                    <p className="text-sm font-medium text-gray-900 truncate">{n.title}</p>
+                    {n.message && <p className="text-xs text-gray-500 mt-0.5 line-clamp-2">{n.message}</p>}
+                    <p className="text-[11px] text-gray-400 mt-1">{timeAgo(n.createdAt)}</p>
+                  </div>
+                </div>
+              </button>
+            ))
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
 function NavSearch() {
   const [open, setOpen] = useState(false);
   const [value, setValue] = useState("");
@@ -147,7 +279,30 @@ function NavSearch() {
 
 function Navbar() {
   const [mobileOpen, setMobileOpen] = useState(false);
-  const { user, logout } = useAuth();
+  const { user, token, logout } = useAuth();
+  const { socket } = useSocket();
+  const [unreadCount, setUnreadCount] = useState(0);
+
+  const refreshUnreadCount = () => {
+    if (!token) return;
+    fetchConversations(token)
+      .then((data) => setUnreadCount(data.conversations.reduce((sum, c) => sum + (c.unreadCount || 0), 0)))
+      .catch(() => {});
+  };
+
+  useEffect(() => {
+    refreshUnreadCount();
+  }, [token]);
+
+  useEffect(() => {
+    if (!socket) return;
+    socket.on("message:new", refreshUnreadCount);
+    socket.on("conversation:updated", refreshUnreadCount);
+    return () => {
+      socket.off("message:new", refreshUnreadCount);
+      socket.off("conversation:updated", refreshUnreadCount);
+    };
+  }, [socket, token]);
   const navigate = useNavigate();
 
   const links = [
@@ -188,6 +343,23 @@ function Navbar() {
 
         <div className="hidden md:flex items-center gap-2">
           <NavSearch />
+
+          {user && <NotificationBell />}
+
+          {user && (
+            <Link
+              to="/chat"
+              aria-label="Messages"
+              className="relative p-2 rounded-full text-gray-500 hover:bg-gray-100 hover:text-gray-900 transition-colors"
+            >
+              <MessageCircle size={18} />
+              {unreadCount > 0 && (
+                <span className="absolute top-0.5 right-0.5 w-4 h-4 flex items-center justify-center text-[10px] font-bold text-white bg-red-500 rounded-full">
+                  {unreadCount > 9 ? "9+" : unreadCount}
+                </span>
+              )}
+            </Link>
+          )}
 
           {user ? (
             <ProfileMenu user={user} onLogout={handleLogout} />
@@ -235,6 +407,21 @@ function Navbar() {
                   {user.initials}
                 </span>
                 {user.name}
+              </Link>
+              <Link
+                to="/chat"
+                onClick={() => setMobileOpen(false)}
+                className="flex items-center justify-between px-2 py-2 text-sm font-medium text-gray-700 rounded-lg hover:bg-gray-50"
+              >
+                <span className="flex items-center gap-2.5">
+                  <MessageCircle size={16} className="text-gray-400" />
+                  Messages
+                </span>
+                {unreadCount > 0 && (
+                  <span className="w-5 h-5 flex items-center justify-center text-[10px] font-bold text-white bg-red-500 rounded-full">
+                    {unreadCount > 9 ? "9+" : unreadCount}
+                  </span>
+                )}
               </Link>
               <button
                 onClick={() => {

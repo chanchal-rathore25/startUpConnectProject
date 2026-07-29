@@ -1,4 +1,3 @@
-
 /**
  * StartupConnect — API Service Layer (REAL BACKEND)
  * -------------------------------------------------
@@ -6,13 +5,13 @@
  *   VITE_API_URL=http://localhost:5000/api
  * -------------------------------------------------
  */
- 
+
 const BASE_URL = import.meta.env?.VITE_API_URL || "http://localhost:5000/api";
- 
+
 function authHeaders(token) {
   return token ? { Authorization: `Bearer ${token}` } : {};
 }
- 
+
 async function handleResponse(res) {
   let data;
   try {
@@ -25,9 +24,9 @@ async function handleResponse(res) {
   }
   return data;
 }
- 
+
 /* ============================= JOBS ============================= */
- 
+
 // filters: { query, type, mode, minSalary, minExperience, page, limit }
 export async function fetchJobs(filters = {}, token) {
   const params = new URLSearchParams();
@@ -41,14 +40,14 @@ export async function fetchJobs(filters = {}, token) {
   });
   return handleResponse(res);
 }
- 
+
 export async function fetchJobById(id, token) {
   const res = await fetch(`${BASE_URL}/jobs/${id}`, {
     headers: { ...authHeaders(token) },
   });
   return handleResponse(res);
 }
- 
+
 export async function toggleSaveJob(id, token) {
   const res = await fetch(`${BASE_URL}/jobs/${id}/save`, {
     method: "POST",
@@ -56,14 +55,14 @@ export async function toggleSaveJob(id, token) {
   });
   return handleResponse(res);
 }
- 
+
 export async function fetchSavedJobs(token) {
   const res = await fetch(`${BASE_URL}/jobs/saved/all`, {
     headers: { ...authHeaders(token) },
   });
   return handleResponse(res);
 }
- 
+
 // payload: { coverLetter, expectedSalary }
 export async function applyToJob(id, payload, token) {
   const res = await fetch(`${BASE_URL}/jobs/${id}/apply`, {
@@ -73,18 +72,70 @@ export async function applyToJob(id, payload, token) {
   });
   return handleResponse(res);
 }
- 
+
 /* ============================= DASHBOARD ============================= */
- 
+
 export async function fetchDashboard(token) {
   const res = await fetch(`${BASE_URL}/dashboard`, {
     headers: { ...authHeaders(token) },
   });
   return handleResponse(res);
 }
- 
+
+/* ============================= CHAT ============================= */
+
+export async function fetchConversations(token) {
+  const res = await fetch(`${BASE_URL}/chat/conversations`, { headers: { ...authHeaders(token) } });
+  return handleResponse(res);
+}
+
+export async function startConversation(userId, token) {
+  const res = await fetch(`${BASE_URL}/chat/conversations/with/${userId}`, {
+    method: "POST",
+    headers: { ...authHeaders(token) },
+  });
+  return handleResponse(res);
+}
+
+export async function fetchMessages(conversationId, token, page = 1) {
+  const res = await fetch(`${BASE_URL}/chat/conversations/${conversationId}/messages?page=${page}`, {
+    headers: { ...authHeaders(token) },
+  });
+  return handleResponse(res);
+}
+
+export async function searchUsers(query, token) {
+  const res = await fetch(`${BASE_URL}/users/search?query=${encodeURIComponent(query)}`, {
+    headers: { ...authHeaders(token) },
+  });
+  return handleResponse(res);
+}
+
+/* ============================= NOTIFICATIONS ============================= */
+
+export async function fetchNotifications(token) {
+  const res = await fetch(`${BASE_URL}/notifications`, { headers: { ...authHeaders(token) } });
+  return handleResponse(res);
+}
+
+export async function markNotificationRead(id, token) {
+  const res = await fetch(`${BASE_URL}/notifications/${id}/read`, {
+    method: "PATCH",
+    headers: { ...authHeaders(token) },
+  });
+  return handleResponse(res);
+}
+
+export async function markAllNotificationsRead(token) {
+  const res = await fetch(`${BASE_URL}/notifications/read-all`, {
+    method: "PATCH",
+    headers: { ...authHeaders(token) },
+  });
+  return handleResponse(res);
+}
+
 /* ============================= AUTH ============================= */
- 
+
 export async function signupUser(form) {
   const res = await fetch(`${BASE_URL}/auth/signup`, {
     method: "POST",
@@ -93,7 +144,7 @@ export async function signupUser(form) {
   });
   return handleResponse(res);
 }
- 
+
 export async function loginUser(email, password) {
   const res = await fetch(`${BASE_URL}/auth/login`, {
     method: "POST",
@@ -102,16 +153,16 @@ export async function loginUser(email, password) {
   });
   return handleResponse(res);
 }
- 
+
 /* ============================= PROFILE ============================= */
- 
+
 export async function fetchMyProfile(token) {
   const res = await fetch(`${BASE_URL}/users/me`, {
     headers: { ...authHeaders(token) },
   });
   return handleResponse(res);
 }
- 
+
 export async function updateUserProfile(patch, token) {
   const res = await fetch(`${BASE_URL}/users/me`, {
     method: "PATCH",
@@ -120,7 +171,7 @@ export async function updateUserProfile(patch, token) {
   });
   return handleResponse(res);
 }
- 
+
 export async function uploadResume(file, token) {
   const formData = new FormData();
   formData.append("resume", file);
@@ -131,7 +182,7 @@ export async function uploadResume(file, token) {
   });
   return handleResponse(res);
 }
- 
+
 export async function uploadPitchDeck(file, token) {
   const formData = new FormData();
   formData.append("pitchDeck", file);

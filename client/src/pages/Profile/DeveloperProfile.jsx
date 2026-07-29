@@ -1,6 +1,5 @@
 import React, { useRef, useState } from "react";
-import { Pencil, Save, X, Plus, Globe, FileText, Upload, Trash2, Briefcase } from "lucide-react";
-import { FaGithub } from "react-icons/fa";
+import { Pencil, Save, X, Plus, Github, Globe, FileText, Upload, Trash2, Briefcase } from "lucide-react";
 import toast from "react-hot-toast";
 import { useAuth } from "../../context/AuthContext";
 import { uploadResume } from "../../api/api1";
@@ -202,7 +201,7 @@ export default function DeveloperProfile() {
               </div>
             ) : (
               <p className="text-sm text-gray-600 flex items-center gap-1.5">
-                <FaGithub size={14} className="text-gray-400" />
+                <Github size={14} className="text-gray-400" />
                 {form.github || "—"}
               </p>
             )}

@@ -87,4 +87,38 @@ async function uploadPitchDeck(req, res) {
   }
 }
 
-module.exports = { getMe, updateMe, uploadResume, uploadPitchDeck };
+// GET /api/users/search?query=... — chat shuru karne ke liye users dhoondhne ke liye
+async function searchUsers(req, res) {
+  try {
+    const { query = "" } = req.query;
+    if (!query.trim()) return res.json({ users: [] });
+
+    const users = await User.find({
+      _id: { $ne: req.user.id },
+      $or: [
+        { name: { $regex: query, $options: "i" } },
+        { email: { $regex: query, $options: "i" } },
+      ],
+    })
+      .select("name role")
+      .limit(10);
+
+    res.json({
+      users: users.map((u) => ({
+        id: u._id,
+        name: u.name,
+        role: u.role,
+        initials: u.name
+          .trim()
+          .split(/\s+/)
+          .slice(0, 2)
+          .map((w) => w[0]?.toUpperCase())
+          .join(""),
+      })),
+    });
+  } catch (err) {
+    res.status(500).json({ message: "Search fail ho gaya.", error: err.message });
+  }
+}
+
+module.exports = { getMe, updateMe, uploadResume, uploadPitchDeck, searchUsers };

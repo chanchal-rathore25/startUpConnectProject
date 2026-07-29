@@ -2,6 +2,7 @@ const Job = require("../models/Job");
 const Application = require("../models/Application");
 const SavedJob = require("../models/SavedJob");
 const User = require("../models/User");
+const createNotification = require("../utils/createNotification");
 
 /**
  * GET /api/jobs
@@ -132,6 +133,16 @@ async function applyToJob(req, res) {
 
     job.applicants += 1;
     await job.save();
+
+    // Applicant ko confirmation notification bhejo (real-time + DB me save)
+    await createNotification({
+      userId: req.user.id,
+      type: "job_applied",
+      title: "Application submitted ✅",
+      message: `Aapne ${job.title} at ${job.company} ke liye apply kiya.`,
+      link: `/jobs/${job._id}`,
+      io: req.app.get("io"),
+    });
 
     res.status(201).json({ message: "Application bhej di gayi.", applicants: job.applicants });
   } catch (err) {

@@ -14,6 +14,7 @@ const StartUpDetails = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
+  
   useEffect(() => {
     const load = async () => {
       setLoading(true);

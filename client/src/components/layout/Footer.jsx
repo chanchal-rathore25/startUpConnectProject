@@ -1,15 +1,16 @@
 import React, { useState } from "react";
-import {
-  Rocket,
-  Mail,
-  ArrowRight,
-  Send,
-} from "lucide-react";
+import { Link } from "react-router-dom";
+import toast from "react-hot-toast";
+import { Rocket, Mail, Send } from "lucide-react";
+import { subscribeNewsletter } from "../../api/api1";
 import { FaGithub } from "react-icons/fa";
+import { FaInstagram } from "react-icons/fa";
+import { FaLinkedin } from "react-icons/fa";
+import { FaTwitter } from "react-icons/fa";
 /**
  * StartupConnect — Footer
  * -------------------------------------------------
- * Newsletter form should POST to:
+ * Newsletter form ab real backend ko hit karta hai:
  *   POST /api/newsletter/subscribe  { email }
  * -------------------------------------------------
  */
@@ -40,25 +41,55 @@ const FOOTER_LINKS = {
   ],
 };
 
-// const SOCIALS = [
-//   { icon: Twitter, href: "https://twitter.com", label: "Twitter" },
-//   { icon: Linkedin, href: "https://linkedin.com", label: "LinkedIn" },
-//   { icon: Github, href: "https://github.com", label: "GitHub" },
-//   { icon: Instagram, href: "https://instagram.com", label: "Instagram" },
-// ];
+// Apne asli social links yahan daal dena
+const SOCIALS = [
+  { icon: FaTwitter, href: "https://twitter.com", label: "Twitter" },
+  { icon: FaLinkedin, href: "https://linkedin.com", label: "LinkedIn" },
+  { icon: FaGithub, href: "https://github.com", label: "GitHub" },
+  { icon: FaInstagram , href: "https://instagram.com", label: "Instagram" },
+];
+
+// In routes ke pages abhi exist karte hain — inhe React Router <Link> se navigate karte hain
+// (client-side, koi full page reload nahi). Baaki (Careers, Blog, Pricing, etc.) abhi
+// build nahi hue, isliye placeholder <a> rehte hain jab tak wo pages ban jayein.
+const LIVE_ROUTES = new Set(["/", "/jobs", "/startups", "/about"]);
+
+function FooterLink({ href, children }) {
+  const className = "footer-link text-sm text-gray-400 inline-flex items-center gap-1";
+  if (LIVE_ROUTES.has(href)) {
+    return (
+      <Link to={href} className={className}>
+        {children}
+      </Link>
+    );
+  }
+  return (
+    <a href={href} className={className}>
+      {children}
+    </a>
+  );
+}
 
 export default function Footer() {
   const [email, setEmail] = useState("");
+  const [subscribing, setSubscribing] = useState(false);
   const [subscribed, setSubscribed] = useState(false);
 
-  const handleSubscribe = (e) => {
+  const handleSubscribe = async (e) => {
     e.preventDefault();
-    if (!email) return;
-    // Replace with real call:
-    // await fetch("/api/newsletter/subscribe", { method: "POST", body: JSON.stringify({ email }) })
-    setSubscribed(true);
-    setEmail("");
-    setTimeout(() => setSubscribed(false), 3000);
+    if (!email.trim()) return;
+    setSubscribing(true);
+    try {
+      const { message } = await subscribeNewsletter(email.trim());
+      toast.success(message || "Subscribe ho gaye! 🎉");
+      setSubscribed(true);
+      setEmail("");
+      setTimeout(() => setSubscribed(false), 3000);
+    } catch (err) {
+      toast.error(err.message || "Subscribe nahi ho paaya. Dobara try karo.");
+    } finally {
+      setSubscribing(false);
+    }
   };
 
   return (
@@ -130,10 +161,11 @@ export default function Footer() {
             </div>
             <button
               type="submit"
-              className="flex items-center gap-1.5 px-5 py-2.5 text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-500 rounded-full transition-colors shrink-0"
+              disabled={subscribing}
+              className="flex items-center gap-1.5 px-5 py-2.5 text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-500 rounded-full transition-colors shrink-0 disabled:opacity-60"
             >
-              {subscribed ? "Subscribed" : "Subscribe"}
-              {!subscribed && <Send size={14} />}
+              {subscribing ? "Subscribing..." : subscribed ? "Subscribed" : "Subscribe"}
+              {!subscribing && !subscribed && <Send size={14} />}
             </button>
           </form>
         </div>
@@ -146,9 +178,7 @@ export default function Footer() {
               <ul className="space-y-2.5">
                 {links.map((link) => (
                   <li key={link.label}>
-                    <a href={link.href} className="footer-link text-sm text-gray-400 inline-flex items-center gap-1">
-                      {link.label}
-                    </a>
+                    <FooterLink href={link.href}>{link.label}</FooterLink>
                   </li>
                 ))}
               </ul>
@@ -158,15 +188,15 @@ export default function Footer() {
 
         {/* Bottom bar */}
         <div className="pt-8 border-t border-gray-800 flex flex-col sm:flex-row items-center justify-between gap-4">
-          <a href="/" className="flex items-center gap-2">
+          <Link to="/" className="flex items-center gap-2">
             <span className="flex items-center justify-center w-8 h-8 rounded-lg bg-gradient-to-br from-indigo-500 to-purple-500 text-white">
               <Rocket size={16} />
             </span>
             <span className="text-sm font-semibold text-white">StartupConnect</span>
-          </a>
+          </Link>
 
           <p className="text-xs text-gray-500 order-3 sm:order-2">
-            © 2026 StartupConnect. All rights reserved.
+            © {new Date().getFullYear()} StartupConnect. All rights reserved.
           </p>
 
           {/* <div className="flex items-center gap-2 order-2 sm:order-3">

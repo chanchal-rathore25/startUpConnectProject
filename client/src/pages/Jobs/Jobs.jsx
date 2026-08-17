@@ -398,7 +398,7 @@ export default function Jobs() {
           <>
             <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-5">
               {jobs.map((job) => (
-                <JobCard key={job.id} job={job} onOpen={handleOpenJob} onToggleSave={handleToggleSave} />
+                <JobCard key={job.id}  onOpen={handleOpenJob} onToggleSave={handleToggleSave} />
               ))}
             </div>
 

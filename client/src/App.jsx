@@ -2,6 +2,7 @@ import React, { useState } from 'react'
 import { Toaster } from 'react-hot-toast'
 import Navbar from './components/layout/Navbar'
 import Home from './pages/Home/Home'
+import JobCard from './pages/Startup/JobCard'
 import StartUpConnect from './pages/Startup/StartUpConnect'
 import Jobs from './pages/Jobs/Jobs'
 import JobDetails from "./pages/Jobs/JobsDetails"
@@ -42,7 +43,7 @@ const App = () => {
           <Routes>
             <Route path="/" element={<Home />} />
             <Route path="/jobs" element={<Jobs />} />
-            <Route path="/jobs/:id" element={<JobDetails />} />
+            <Route path="/jobs/:id" element={<JobCard />} />
             <Route path="/startups" element={<StartUpConnect />} />
             <Route path="/startups/:id" element={<StartUpDetails />} />
             <Route path="/about" element={<About />} />

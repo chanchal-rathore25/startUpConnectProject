@@ -133,7 +133,17 @@ export async function markAllNotificationsRead(token) {
   });
   return handleResponse(res);
 }
-
+/* ============================= NEWSLETTER ============================= */
+ 
+export async function subscribeNewsletter(email) {
+  const res = await fetch(`${BASE_URL}/newsletter/subscribe`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ email }),
+  });
+  return handleResponse(res);
+}
+ 
 /* ============================= AUTH ============================= */
 
 export async function signupUser(form) {

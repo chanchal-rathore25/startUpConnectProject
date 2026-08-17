@@ -23,11 +23,20 @@ const startupSchema = new mongoose.Schema(
     name: { type: String, required: true, trim: true },
     industry: { type: String, required: true }, // e.g. "AI Healthcare Startup"
     location: { type: String, required: true },
-    stage: {
-      type: String,
-      enum: ["Idea Stage", "Seed Stage", "Series A", "Series B+", "Bootstrapped"],
-      default: "Seed Stage",
-    },
+   stage: {
+  type: String,
+  enum: [
+    "Idea Stage",
+    "Pre-seed",
+    "Seed Stage",
+    "Series A",
+    "Series B",
+    "Series C",
+    "Series B+",
+    "Bootstrapped",
+  ],
+  default: "Pre-seed",
+},
     description: { type: String, required: true },
     fundingNeeded: { type: String, required: true }, // e.g. "₹2 Cr"
     teamSize: { type: Number, required: true },
